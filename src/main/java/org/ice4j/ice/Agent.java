@@ -1548,6 +1548,11 @@ public class Agent
     }
 
     /**
+     * Workaround: TCP may take precedence over UDP
+     */
+    private ScheduledExecutorService timerTCPCheck = Executors.newSingleThreadScheduledExecutor();
+    
+    /**
      * Notifies the implementation that the {@link ConnectivityCheckServer} has
      * just received a message on <tt>localAddress</tt> originating at
      * <tt>remoteAddress</tt> carrying the specified <tt>priority</tt>. This
@@ -1623,6 +1628,14 @@ public class Agent
             {
                 logger.debug(() -> "Received check from "
                     + triggeredPair.toShortString() + " triggered a check.");
+                
+                // Workaround: TCP may take precedence over UDP. TCP is delayed and then triggerCheck.
+                if(triggeredPair.getLocalCandidate().getTransport() == Transport.TCP){
+                    timerTCPCheck.schedule(new Runnable() { public void run() {
+                        triggerCheck(triggeredPair);
+                    }}, 1000 , TimeUnit.MILLISECONDS);
+                    return;
+                }
 
                 // We have been started, and have not failed (yet). If this is
                 // a new pair, handle it (even if we have already completed).
